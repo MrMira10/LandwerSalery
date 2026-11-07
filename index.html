@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת ניהול שעות ושכר חודשית</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --success-color: #16a34a;
+            --danger-color: #dc2626;
+            --sidebar-width: 280px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-card {
+            background: #fff;
+            padding: 32px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .app-layout {
+            display: flex;
+            width: 100vw;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--card-bg);
+            border-left: 1px solid var(--border-color);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: var(--text-main);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+
+        input,
+        select {
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background-color: #fff;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        button {
+            padding: 10px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #334155;
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        .btn-danger:hover {
+            background-color: #b91c1c;
+        }
+
+        .summary-box {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .summary-item .title {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .summary-item .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--success-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th,
+        td {
+            padding: 12px 10px;
+            text-align: right;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .details-row {
+            background-color: #f8fafc;
+            display: none;
+        }
+
+        .details-row.active {
+            display: table-row;
+        }
+
+        .details-content {
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            color: #334155;
+            line-height: 1.6;
+        }
+
+        .details-content ul {
+            padding-right: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 20px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-weekday {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .badge-sat {
+            background: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card">
+            <h2 style="margin-bottom: 8px; text-align: center;">התחברות למערכת</h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; text-align: center;">הזן שם
+                משתמש כדי לנהל את השעות שלך</p>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label for="usernameInput">שם משתמש / עובד:</label>
+                <input type="text" id="usernameInput" placeholder="למשל: יובל, שירה...">
+            </div>
+
+            <button style="width: 100%;" onclick="login()">התחבר למערכת</button>
+        </div>
+    </div>
+
+    <div class="app-layout">
+
+        <aside class="sidebar">
+            <h3>הגדרות שכר</h3>
+            <hr style="border: 0; border-top: 1px solid var(--border-color);">
+
+            <div class="form-group">
+                <label>תעריף בסיס קבוע (₪):</label>
+                <input type="number" id="baseRate" value="35.4" readonly
+                    style="background-color: #f1f5f9; cursor: not-allowed;">
+                <small style="color: var(--text-muted); font-size: 0.75rem;">בסיס קבוע לשבתות ושעות נוספות</small>
+            </div>
+
+            <div class="form-group">
+                <label for="bonusRate">תוספת בונוס לשעה (₪):</label>
+                <input type="number" id="bonusRate" value="4.6" step="0.1" onchange="updateUserSettings()">
+                <small style="color: var(--text-muted); font-size: 0.75rem;">מתווסף לשעת חול רגילה</small>
+            </div>
+
+            <div class="card" style="background: #eff6ff; border-color: #bfdbfe; padding: 12px;">
+                <div style="font-size: 0.85rem; color: #1e40af;">
+                    <strong>שכר בסיס רגיל כעת:</strong><br>
+                    <span id="effectiveBaseDisplay">40.00</span> ₪ לשעה
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+
+            <div class="header-bar">
+                <div>
+                    <h2 id="welcomeText">שלום, משתמש</h2>
+                    <span style="font-size: 0.85rem; color: var(--text-muted);">מערכת חישוב שעות חודשית</span>
+                </div>
+                <button class="btn-secondary" onclick="logout()">התחלף משתמש</button>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 16px;">הוספת משמרת חדשה</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="shiftDate">תאריך:</label>
+                        <input type="date" id="shiftDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="shiftType">סוג משמרת:</label>
+                        <select id="shiftType">
+                            <option value="weekday">יום חול</option>
+                            <option value="saturday">שבת</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="startTime">שעת התחלה:</label>
+                        <input type="time" id="startTime" value="08:00">
+                    </div>
+                    <div class="form-group">
+                        <label for="endTime">שעת סיום:</label>
+                        <input type="time" id="endTime" value="16:00">
+                    </div>
+                </div>
+                <button onclick="addShift()">הוסף משמרת</button>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3>סיכום חודשי מצטבר</h3>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="monthFilter" style="margin: 0;">בחר חודש לצפייה:</label>
+                        <input type="month" id="monthFilter" onchange="renderTable()" style="padding: 6px 10px;">
+                    </div>
+                </div>
+
+                <div class="summary-box">
+                    <div class="summary-item">
+                        <div class="title">סה"כ שעות בחודש הנבחר</div>
+                        <div class="value" id="totalHoursMonth">0.00</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="title">סה"כ שכר נטו משוער לחודש</div>
+                        <div class="value"><span id="totalPayMonth">0.00</span> ₪</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 16px;">פירוט משמרות לחודש הנבחר</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>תאריך</th>
+                                <th>סוג</th>
+                                <th>שעות</th>
+                                <th>סה"כ שכר</th>
+                                <th>פירוט</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shiftsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        let currentUser = localStorage.getItem('active_user') || '';
+        let shifts = [];
+
+        const today = new Date();
+        document.getElementById('shiftDate').valueAsDate = today;
+        document.getElementById('monthFilter').value = today.toISOString().slice(0, 7);
+
+        if (currentUser) {
+            initUserSession();
+        }
+
+        function login() {
+            const username = document.getElementById('usernameInput').value.trim();
+            if (!username) {
+                alert("נא להזין שם משתמש");
+                return;
+            }
+            currentUser = username;
+            localStorage.setItem('active_user', currentUser);
+            initUserSession();
+        }
+
+        function logout() {
+            localStorage.removeItem('active_user');
+            currentUser = '';
+            document.getElementById('authOverlay').style.display = 'flex';
+        }
+
+        function initUserSession() {
+            document.getElementById('authOverlay').style.display = 'none';
+            document.getElementById('welcomeText').innerText = `שלום, ${currentUser}`;
+
+            const savedSettings = JSON.parse(localStorage.getItem(`settings_${currentUser}`)) || { bonusRate: 4.6 };
+            document.getElementById('bonusRate').value = savedSettings.bonusRate;
+
+            shifts = JSON.parse(localStorage.getItem(`shifts_${currentUser}`)) || [];
+
+            updateEffectiveBaseDisplay();
+            renderTable();
+        }
+
+        function updateUserSettings() {
+            const bonus = parseFloat(document.getElementById('bonusRate').value) || 0;
+            localStorage.setItem(`settings_${currentUser}`, JSON.stringify({ bonusRate: bonus }));
+            updateEffectiveBaseDisplay();
+
+            shifts.forEach(s => {
+                const recalculated = calculateShiftPay(s.type, s.start, s.end, bonus);
+                s.hours = recalculated.hours;
+                s.pay = recalculated.pay;
+                s.details = recalculated.details;
+            });
+            saveAndRender();
+        }
+
+        function updateEffectiveBaseDisplay() {
+            const bonus = parseFloat(document.getElementById('bonusRate').value) || 0;
+            document.getElementById('effectiveBaseDisplay').innerText = (35.4 + bonus).toFixed(2);
+        }
+
+        function calculateShiftPay(shiftType, startStr, endStr, bonusRate) {
+            let [startH, startM] = startStr.split(':').map(Number);
+            let [endH, endM] = endStr.split(':').map(Number);
+
+            let startMinutes = startH * 60 + startM;
+            let endMinutes = endH * 60 + endM;
+
+            if (endMinutes <= startMinutes) {
+                endMinutes += 24 * 60;
+            }
+
+            const BASE_CALC = 35.4;
+            const BASE_WEEKDAY = BASE_CALC + bonusRate;
+            const SAT_CUTOFF_MINUTES = 19 * 60;
+
+            let totalPay = 0;
+            let totalMinutes = endMinutes - startMinutes;
+            let breakdown = {};
+
+            let currentMinute = startMinutes;
+            let minuteCount = 0;
+
+            while (currentMinute < endMinutes) {
+                minuteCount++;
+                let currentHourInShift = Math.ceil(minuteCount / 60);
+                let minuteOfDay = currentMinute % (24 * 60);
+
+                let rateForMinute = 0;
+                let categoryKey = '';
+
+                if (shiftType === 'weekday') {
+                    if (currentHourInShift <= 8) {
+                        rateForMinute = BASE_WEEKDAY / 60;
+                        categoryKey = `שעות בסיס יום חול (${BASE_WEEKDAY.toFixed(2)} ₪)`;
+                    } else if (currentHourInShift <= 10) {
+                        rateForMinute = (BASE_CALC * 1.25) / 60;
+                        categoryKey = `שעות נוספות 125% מ-35.4 ₪ (${(BASE_CALC * 1.25).toFixed(2)} ₪)`;
+                    } else {
+                        rateForMinute = (BASE_CALC * 1.50) / 60;
+                        categoryKey = `שעות נוספות 150% מ-35.4 ₪ (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+                    }
+                } else {
+                    let isBeforeSatCutoff = minuteOfDay < SAT_CUTOFF_MINUTES;
+
+                    if (isBeforeSatCutoff) {
+                        if (currentHourInShift <= 8) {
+                            rateForMinute = (BASE_CALC * 1.50) / 60;
+                            categoryKey = `שעות שבת 150% מ-35.4 ₪ (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+                        } else {
+                            rateForMinute = (BASE_CALC * 1.75) / 60;
+                            categoryKey = `שעות נוספות שבת 175% מ-35.4 ₪ (${(BASE_CALC * 1.75).toFixed(2)} ₪)`;
+                        }
+                    } else {
+                        if (currentHourInShift <= 8) {
+                            rateForMinute = BASE_WEEKDAY / 60;
+                            categoryKey = `שעות בסיס לאחר 19:00 (${BASE_WEEKDAY.toFixed(2)} ₪)`;
+                        } else {
+                            rateForMinute = (BASE_CALC * 1.50) / 60;
+                            categoryKey = `שעות נוספות לאחר 19:00 150% מ-35.4 ₪ (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+                        }
+                    }
+                }
+
+                totalPay += rateForMinute;
+
+                if (!breakdown[categoryKey]) {
+                    breakdown[categoryKey] = { minutes: 0, sum: 0 };
+                }
+                breakdown[categoryKey].minutes++;
+                breakdown[categoryKey].sum += rateForMinute;
+
+                currentMinute++;
+            }
+
+            let detailsList = [];
+            for (const [key, data] of Object.entries(breakdown)) {
+                const hours = (data.minutes / 60).toFixed(2);
+                detailsList.push(`${key}: ${hours} שעות = ${data.sum.toFixed(2)} ₪`);
+            }
+
+            return {
+                pay: totalPay,
+                hours: totalMinutes / 60,
+                details: detailsList
+            };
+        }
+
+        function addShift() {
+            const date = document.getElementById('shiftDate').value;
+            const type = document.getElementById('shiftType').value;
+            const start = document.getElementById('startTime').value;
+            const end = document.getElementById('endTime').value;
+            const bonus = parseFloat(document.getElementById('bonusRate').value) || 0;
+
+            if (!date || !start || !end) {
+                alert("נא למלא את כל השדות");
+                return;
+            }
+
+            const result = calculateShiftPay(type, start, end, bonus);
+
+            const newShift = {
+                id: Date.now(),
+                date,
+                type,
+                start,
+                end,
+                hours: result.hours,
+                pay: result.pay,
+                details: result.details
+            };
+
+            shifts.push(newShift);
+
+            // עדכון חודש הצפייה לחודש של המשמרת שהוספה
+            document.getElementById('monthFilter').value = date.slice(0, 7);
+
+            saveAndRender();
+        }
+
+        function deleteShift(id) {
+            shifts = shifts.filter(s => s.id !== id);
+            saveAndRender();
+        }
+
+        function toggleDetails(id) {
+            const detailsRow = document.getElementById(`details-${id}`);
+            detailsRow.classList.toggle('active');
+        }
+
+        function saveAndRender() {
+            localStorage.setItem(`shifts_${currentUser}`, JSON.stringify(shifts));
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('shiftsTableBody');
+            tbody.innerHTML = '';
+
+            const selectedMonth = document.getElementById('monthFilter').value; // פורמט YYYY-MM
+
+            // סינון משמרות לפי החודש הנבחר בלבד
+            const filteredShifts = shifts.filter(s => s.date.startsWith(selectedMonth));
+
+            if (filteredShifts.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">אין משמרות רשומות לחודש הנבחר.</td></tr>`;
+                document.getElementById('totalHoursMonth').innerText = '0.00';
+                document.getElementById('totalPayMonth').innerText = '0.00';
+                return;
+            }
+
+            filteredShifts.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            let totalMonthPay = 0;
+            let totalMonthHours = 0;
+
+            filteredShifts.forEach(shift => {
+                totalMonthPay += shift.pay;
+                totalMonthHours += shift.hours;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+      <td>${shift.date}</td>
+      <td>
+        <span class="badge ${shift.type === 'weekday' ? 'badge-weekday' : 'badge-sat'}">
+          ${shift.type === 'weekday' ? 'יום חול' : 'שבת'}
+        </span>
+        (${shift.start} - ${shift.end})
+      </td>
+      <td>${shift.hours.toFixed(2)} שעות</td>
+      <td><strong>${shift.pay.toFixed(2)} ₪</strong></td>
+      <td>
+        <button class="btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="toggleDetails(${shift.id})">
+          הצג חישוב
+        </button>
+      </td>
+      <td><button class="btn-danger" onclick="deleteShift(${shift.id})">מחק</button></td>
+    `;
+
+                const detailsTr = document.createElement('tr');
+                detailsTr.id = `details-${shift.id}`;
+                detailsTr.className = 'details-row';
+                detailsTr.innerHTML = `
+      <td colspan="6">
+        <div class="details-content">
+          <strong>פירוט שלבי החישוב למשמרת:</strong>
+          <ul>
+            ${shift.details.map(d => `<li>• ${d}</li>`).join('')}
+          </ul>
+        </div>
+      </td>
+    `;
+
+                tbody.appendChild(tr);
+                tbody.appendChild(detailsTr);
+            });
+
+            document.getElementById('totalHoursMonth').innerText = totalMonthHours.toFixed(2);
+            document.getElementById('totalPayMonth').innerText = totalMonthPay.toFixed(2);
+        }
+    </script>
+
+</body>
+
+</html>
