@@ -199,7 +199,7 @@
       <input type="text" id="userInput" placeholder="הקלד שם משתמש...">
     </div>
     
-    <button onclick="handleLogin()">כניסה למערכת</button>
+    <button id="loginBtn" type="button">כניסה למערכת</button>
   </div>
 
   <!-- מסך ניהול השעות -->
@@ -210,18 +210,18 @@
         <h3 id="welcomeTitle" style="margin: 0;">שלום</h3>
         <span style="font-size: 0.75rem; color: var(--text-muted);">ניהול שכר חודשי</span>
       </div>
-      <button class="btn-secondary" onclick="handleLogout()">החלף משתמש</button>
+      <button id="logoutBtn" class="btn-secondary" type="button">החלף משתמש</button>
     </div>
 
     <!-- הגדרת בונוס -->
     <div class="section-card">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 0.85rem;">בסיס: 35.4 ₪ + בונוס: <strong id="bonusDisplay">4.6</strong> ₪</span>
-        <button class="btn-secondary" onclick="toggleBonusEdit()">שנה בונוס</button>
+        <button id="toggleBonusBtn" class="btn-secondary" type="button">שנה בונוס</button>
       </div>
       <div id="bonusBox" class="hidden" style="margin-top: 10px;">
         <label>סכום בונוס לשעת חול (₪):</label>
-        <input type="number" id="bonusInput" value="4.6" step="0.1" onchange="saveBonus()">
+        <input type="number" id="bonusInput" value="4.6" step="0.1">
       </div>
     </div>
 
@@ -249,14 +249,14 @@
           <input type="time" id="endTime" value="16:00">
         </div>
       </div>
-      <button onclick="addShift()">הוסף משמרת</button>
+      <button id="addShiftBtn" type="button">הוסף משמרת</button>
     </div>
 
     <!-- סיכום -->
     <div class="section-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h3 style="margin: 0;">סיכום חודשי</h3>
-        <input type="month" id="monthFilter" onchange="renderApp()" style="width: auto; padding: 4px;">
+        <input type="month" id="monthFilter" style="width: auto; padding: 4px;">
       </div>
       <div class="summary-box">
         <div class="summary-item">
@@ -292,105 +292,265 @@
   </div>
 
 <script>
-let currentUser = localStorage.getItem('active_user') || '';
-let shifts = [];
+document.addEventListener('DOMContentLoaded', function() {
+  let currentUser = localStorage.getItem('active_user') || '';
+  let shifts = [];
 
-document.getElementById('shiftDate').valueAsDate = new Date();
-document.getElementById('monthFilter').value = new Date().toISOString().slice(0, 7);
+  const today = new Date();
+  document.getElementById('shiftDate').valueAsDate = today;
+  document.getElementById('monthFilter').value = today.toISOString().slice(0, 7);
 
-if (currentUser) {
-  showApp();
-}
+  // האזנות כפתורים בטוחות
+  document.getElementById('loginBtn').addEventListener('click', handleLogin);
+  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+  document.getElementById('toggleBonusBtn').addEventListener('click', toggleBonusEdit);
+  document.getElementById('addShiftBtn').addEventListener('click', addShift);
+  document.getElementById('bonusInput').addEventListener('input', saveBonus);
+  document.getElementById('monthFilter').addEventListener('change', renderApp);
 
-function handleLogin() {
-  const val = document.getElementById('userInput').value.trim();
-  if (!val) {
-    alert("נא להזין שם משתמש");
-    return;
-  }
-  currentUser = val;
-  localStorage.setItem('active_user', currentUser);
-  showApp();
-}
+  document.getElementById('userInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') handleLogin();
+  });
 
-function handleLogout() {
-  localStorage.removeItem('active_user');
-  currentUser = '';
-  document.getElementById('userInput').value = '';
-  document.getElementById('appScreen').classList.add('hidden');
-  document.getElementById('loginScreen').classList.remove('hidden');
-}
-
-function showApp() {
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('appScreen').classList.remove('hidden');
-  document.getElementById('welcomeTitle').innerText = `שלום, ${currentUser}`;
-  
-  const savedBonus = localStorage.getItem(`bonus_${currentUser}`);
-  if (savedBonus !== null) {
-    document.getElementById('bonusInput').value = savedBonus;
-    document.getElementById('bonusDisplay').innerText = savedBonus;
+  if (currentUser) {
+    showApp();
   }
 
-  shifts = JSON.parse(localStorage.getItem(`shifts_${currentUser}`)) || [];
-  renderApp();
-}
+  function handleLogin() {
+    const val = document.getElementById('userInput').value.trim();
+    if (!val) {
+      alert("נא להזין שם משתמש");
+      return;
+    }
+    currentUser = val;
+    localStorage.setItem('active_user', currentUser);
+    showApp();
+  }
 
-function toggleBonusEdit() {
-  const box = document.getElementById('bonusBox');
-  box.classList.toggle('hidden');
-}
+  function handleLogout() {
+    localStorage.removeItem('active_user');
+    currentUser = '';
+    document.getElementById('userInput').value = '';
+    document.getElementById('appScreen').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
 
-function saveBonus() {
-  const b = document.getElementById('bonusInput').value;
-  localStorage.setItem(`bonus_${currentUser}`, b);
-  document.getElementById('bonusDisplay').innerText = b;
-  recalculateAll();
-}
-
-function calculatePay(type, startStr, endStr, bonusRate) {
-  let [sh, sm] = startStr.split(':').map(Number);
-  let [eh, em] = endStr.split(':').map(Number);
-
-  let startMinutes = sh * 60 + sm;
-  let endMinutes = eh * 60 + em;
-  if (endMinutes <= startMinutes) endMinutes += 24 * 60;
-
-  const BASE_CALC = 35.4;
-  const BASE_WEEKDAY = BASE_CALC + Number(bonusRate);
-  const SAT_CUTOFF_MINUTES = 19 * 60;
-
-  let totalPay = 0;
-  let totalMinutes = endMinutes - startMinutes;
-  let breakdown = {};
-
-  let currentMinute = startMinutes;
-  let minuteCount = 0;
-
-  while (currentMinute < endMinutes) {
-    minuteCount++;
-    let currentHourInShift = Math.ceil(minuteCount / 60);
-    let minuteOfDay = currentMinute % (24 * 60);
+  function showApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appScreen').classList.remove('hidden');
+    document.getElementById('welcomeTitle').innerText = `שלום, ${currentUser}`;
     
-    let rateForMinute = 0;
-    let categoryKey = '';
+    const savedBonus = localStorage.getItem(`bonus_${currentUser}`);
+    if (savedBonus !== null) {
+      document.getElementById('bonusInput').value = savedBonus;
+      document.getElementById('bonusDisplay').innerText = savedBonus;
+    }
 
-    if (type === 'weekday') {
-      if (currentHourInShift <= 8) {
-        rateForMinute = BASE_WEEKDAY / 60;
-        categoryKey = `שעות בסיס (${BASE_WEEKDAY.toFixed(2)} ₪)`;
-      } else if (currentHourInShift <= 10) {
-        rateForMinute = (BASE_CALC * 1.25) / 60;
-        categoryKey = `שעות נוספות 125% (${(BASE_CALC * 1.25).toFixed(2)} ₪)`;
-      } else {
-        rateForMinute = (BASE_CALC * 1.50) / 60;
-        categoryKey = `שעות נוספות 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
-      }
-    } else {
-      let isBeforeSatCutoff = minuteOfDay < SAT_CUTOFF_MINUTES;
+    shifts = JSON.parse(localStorage.getItem(`shifts_${currentUser}`)) || [];
+    renderApp();
+  }
 
-      if (isBeforeSatCutoff) {
+  function toggleBonusEdit() {
+    const box = document.getElementById('bonusBox');
+    box.classList.toggle('hidden');
+  }
+
+  function saveBonus() {
+    const b = document.getElementById('bonusInput').value;
+    localStorage.setItem(`bonus_${currentUser}`, b);
+    document.getElementById('bonusDisplay').innerText = b;
+    recalculateAll();
+  }
+
+  function calculatePay(type, startStr, endStr, bonusRate) {
+    let [sh, sm] = startStr.split(':').map(Number);
+    let [eh, em] = endStr.split(':').map(Number);
+
+    let startMinutes = sh * 60 + sm;
+    let endMinutes = eh * 60 + em;
+    if (endMinutes <= startMinutes) endMinutes += 24 * 60;
+
+    const BASE_CALC = 35.4;
+    const BASE_WEEKDAY = BASE_CALC + Number(bonusRate);
+    const SAT_CUTOFF_MINUTES = 19 * 60;
+
+    let totalPay = 0;
+    let totalMinutes = endMinutes - startMinutes;
+    let breakdown = {};
+
+    let currentMinute = startMinutes;
+    let minuteCount = 0;
+
+    while (currentMinute < endMinutes) {
+      minuteCount++;
+      let currentHourInShift = Math.ceil(minuteCount / 60);
+      let minuteOfDay = currentMinute % (24 * 60);
+      
+      let rateForMinute = 0;
+      let categoryKey = '';
+
+      if (type === 'weekday') {
         if (currentHourInShift <= 8) {
-          rateForMinute = (BASE_CALC * 1.50) / 60;
-          categoryKey = `שבת 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+          rateForMinute = BASE_WEEKDAY / 60;
+          categoryKey = `שעות בסיס (${BASE_WEEKDAY.toFixed(2)} ₪)`;
+        } else if (currentHourInShift <= 10) {
+          rateForMinute = (BASE_CALC * 1.25) / 60;
+          categoryKey = `שעות נוספות 125% (${(BASE_CALC * 1.25).toFixed(2)} ₪)`;
         } else {
+          rateForMinute = (BASE_CALC * 1.50) / 60;
+          categoryKey = `שעות נוספות 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+        }
+      } else {
+        let isBeforeSatCutoff = minuteOfDay < SAT_CUTOFF_MINUTES;
+
+        if (isBeforeSatCutoff) {
+          if (currentHourInShift <= 8) {
+            rateForMinute = (BASE_CALC * 1.50) / 60;
+            categoryKey = `שבת 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+          } else {
+            rateForMinute = (BASE_CALC * 1.75) / 60;
+            categoryKey = `שעות נוספות שבת 175% (${(BASE_CALC * 1.75).toFixed(2)} ₪)`;
+          }
+        } else {
+          if (currentHourInShift <= 8) {
+            rateForMinute = BASE_WEEKDAY / 60;
+            categoryKey = `מוצ"ש רגיל (${BASE_WEEKDAY.toFixed(2)} ₪)`;
+          } else {
+            rateForMinute = (BASE_CALC * 1.50) / 60;
+            categoryKey = `נוספות מוצ"ש 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+          }
+        }
+      }
+
+      totalPay += rateForMinute;
+
+      if (!breakdown[categoryKey]) {
+        breakdown[categoryKey] = { minutes: 0, sum: 0 };
+      }
+      breakdown[categoryKey].minutes++;
+      breakdown[categoryKey].sum += rateForMinute;
+
+      currentMinute++;
+    }
+
+    let detailsList = [];
+    for (const [key, data] of Object.entries(breakdown)) {
+      const hours = (data.minutes / 60).toFixed(2);
+      detailsList.push(`${key}: ${hours} ש' = ${data.sum.toFixed(2)} ₪`);
+    }
+
+    return {
+      hours: totalMinutes / 60,
+      pay: totalPay,
+      details: detailsList
+    };
+  }
+
+  function addShift() {
+    const date = document.getElementById('shiftDate').value;
+    const type = document.getElementById('shiftType').value;
+    const start = document.getElementById('startTime').value;
+    const end = document.getElementById('endTime').value;
+    const bonus = document.getElementById('bonusInput').value;
+
+    if (!date || !start || !end) {
+      alert("נא למלא את כל השדות");
+      return;
+    }
+
+    const res = calculatePay(type, start, end, bonus);
+    shifts.push({ 
+      id: Date.now(), 
+      date, 
+      type, 
+      start, 
+      end, 
+      hours: res.hours, 
+      pay: res.pay, 
+      details: res.details 
+    });
+    saveAndRender();
+  }
+
+  window.deleteShift = function(id) {
+    shifts = shifts.filter(s => s.id !== id);
+    saveAndRender();
+  }
+
+  window.toggleDetails = function(id) {
+    const detailsRow = document.getElementById(`details-${id}`);
+    if (detailsRow) {
+      detailsRow.classList.toggle('active');
+    }
+  }
+
+  function recalculateAll() {
+    const bonus = document.getElementById('bonusInput').value;
+    shifts.forEach(s => {
+      let res = calculatePay(s.type, s.start, s.end, bonus);
+      s.hours = res.hours;
+      s.pay = res.pay;
+      s.details = res.details;
+    });
+    saveAndRender();
+  }
+
+  function saveAndRender() {
+    localStorage.setItem(`shifts_${currentUser}`, JSON.stringify(shifts));
+    renderApp();
+  }
+
+  function renderApp() {
+    const tbody = document.getElementById('tableBody');
+    const month = document.getElementById('monthFilter').value;
+    const filtered = shifts.filter(s => s.date.startsWith(month));
+
+    tbody.innerHTML = '';
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td></tr>`;
+      document.getElementById('sumHours').innerText = '0.00';
+      document.getElementById('sumPay').innerText = '0.00';
+      return;
+    }
+
+    filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let totalH = 0, totalP = 0;
+
+    filtered.forEach(s => {
+      totalH += s.hours;
+      totalP += s.pay;
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${s.date.slice(8)}/${s.date.slice(5, 7)} (${s.type === 'weekday' ? 'חול' : 'שבת'})</td>
+        <td>${s.hours.toFixed(2)}ש'</td>
+        <td><strong>${s.pay.toFixed(2)}₪</strong></td>
+        <td><button class="btn-secondary" type="button" onclick="toggleDetails(${s.id})">חישוב</button></td>
+        <td><button class="btn-danger" type="button" onclick="deleteShift(${s.id})">מחק</button></td>
+      `;
+
+      const detailsTr = document.createElement('tr');
+      detailsTr.id = `details-${s.id}`;
+      detailsTr.className = 'details-row';
+      detailsTr.innerHTML = `
+        <td colspan="5">
+          <div class="details-content">
+            <strong>פירוט חישוב:</strong>
+            <ul>
+              ${s.details.map(d => `<li>• ${d}</li>`).join('')}
+            </ul>
+          </div>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+      tbody.appendChild(detailsTr);
+    });
+
+    document.getElementById('sumHours').innerText = totalH.toFixed(2);
+    document.getElementById('sumPay').innerText = totalP.toFixed(2);
+  }
+});
+</script>
+</body>
+</html>
