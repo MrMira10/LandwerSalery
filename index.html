@@ -105,6 +105,7 @@
 
     .btn-danger {
       background-color: var(--danger-color);
+      color: white;
       width: auto;
       padding: 6px 10px;
       font-size: 0.8rem;
@@ -164,6 +165,26 @@
       padding-bottom: 16px;
       border-bottom: 1px solid var(--border-color);
     }
+
+    .details-row {
+      background-color: #f8fafc;
+      display: none;
+    }
+
+    .details-row.active {
+      display: table-row;
+    }
+
+    .details-content {
+      padding: 8px 10px;
+      font-size: 0.75rem;
+      color: #334155;
+      line-height: 1.5;
+    }
+
+    .details-content ul {
+      padding-right: 15px;
+    }
   </style>
 </head>
 <body>
@@ -181,7 +202,7 @@
     <button onclick="handleLogin()">כניסה למערכת</button>
   </div>
 
-  <!-- מסך ניהול השעות (מוסתר בהתחלה) -->
+  <!-- מסך ניהול השעות -->
   <div id="appScreen" class="container hidden">
     
     <div class="header-flex">
@@ -258,11 +279,12 @@
             <th>תאריך</th>
             <th>שעות</th>
             <th>שכר</th>
+            <th>פירוט</th>
             <th>מחיקה</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td></tr>
+          <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td></tr>
         </tbody>
       </table>
     </div>
@@ -326,111 +348,49 @@ function saveBonus() {
   recalculateAll();
 }
 
-function calculatePay(type, startStr, endStr, bonus) {
+function calculatePay(type, startStr, endStr, bonusRate) {
   let [sh, sm] = startStr.split(':').map(Number);
   let [eh, em] = endStr.split(':').map(Number);
-  let startMin = sh * 60 + sm;
-  let endMin = eh * 60 + em;
-  if (endMin <= startMin) endMin += 24 * 60;
 
-  const baseCalc = 35.4;
-  const weekdayRate = baseCalc + Number(bonus);
-  let totalMin = endMin - startMin;
-  let pay = 0;
+  let startMinutes = sh * 60 + sm;
+  let endMinutes = eh * 60 + em;
+  if (endMinutes <= startMinutes) endMinutes += 24 * 60;
 
-  for (let i = 0; i < totalMin; i++) {
-    let currentMinFromStart = i + 1;
-    let hourNum = Math.ceil(currentMinFromStart / 60);
-    let timeOfDay = (startMin + i) % (24 * 60);
+  const BASE_CALC = 35.4;
+  const BASE_WEEKDAY = BASE_CALC + Number(bonusRate);
+  const SAT_CUTOFF_MINUTES = 19 * 60;
+
+  let totalPay = 0;
+  let totalMinutes = endMinutes - startMinutes;
+  let breakdown = {};
+
+  let currentMinute = startMinutes;
+  let minuteCount = 0;
+
+  while (currentMinute < endMinutes) {
+    minuteCount++;
+    let currentHourInShift = Math.ceil(minuteCount / 60);
+    let minuteOfDay = currentMinute % (24 * 60);
+    
+    let rateForMinute = 0;
+    let categoryKey = '';
 
     if (type === 'weekday') {
-      if (hourNum <= 8) pay += weekdayRate / 60;
-      else if (hourNum <= 10) pay += (baseCalc * 1.25) / 60;
-      else pay += (baseCalc * 1.50) / 60;
-    } else {
-      let isBefore19 = timeOfDay < 19 * 60;
-      if (isBefore19) {
-        if (hourNum <= 8) pay += (baseCalc * 1.50) / 60;
-        else pay += (baseCalc * 1.75) / 60;
+      if (currentHourInShift <= 8) {
+        rateForMinute = BASE_WEEKDAY / 60;
+        categoryKey = `שעות בסיס (${BASE_WEEKDAY.toFixed(2)} ₪)`;
+      } else if (currentHourInShift <= 10) {
+        rateForMinute = (BASE_CALC * 1.25) / 60;
+        categoryKey = `שעות נוספות 125% (${(BASE_CALC * 1.25).toFixed(2)} ₪)`;
       } else {
-        if (hourNum <= 8) pay += weekdayRate / 60;
-        else pay += (baseCalc * 1.50) / 60;
+        rateForMinute = (BASE_CALC * 1.50) / 60;
+        categoryKey = `שעות נוספות 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
       }
-    }
-  }
+    } else {
+      let isBeforeSatCutoff = minuteOfDay < SAT_CUTOFF_MINUTES;
 
-  return { hours: totalMin / 60, pay: pay };
-}
-
-function addShift() {
-  const date = document.getElementById('shiftDate').value;
-  const type = document.getElementById('shiftType').value;
-  const start = document.getElementById('startTime').value;
-  const end = document.getElementById('endTime').value;
-  const bonus = document.getElementById('bonusInput').value;
-
-  if (!date || !start || !end) {
-    alert("נא למלא את כל השדות");
-    return;
-  }
-
-  const res = calculatePay(type, start, end, bonus);
-  shifts.push({ id: Date.now(), date, type, start, end, hours: res.hours, pay: res.pay });
-  saveAndRender();
-}
-
-function deleteShift(id) {
-  shifts = shifts.filter(s => s.id !== id);
-  saveAndRender();
-}
-
-function recalculateAll() {
-  const bonus = document.getElementById('bonusInput').value;
-  shifts.forEach(s => {
-    let res = calculatePay(s.type, s.start, s.end, bonus);
-    s.hours = res.hours;
-    s.pay = res.pay;
-  });
-  saveAndRender();
-}
-
-function saveAndRender() {
-  localStorage.setItem(`shifts_${currentUser}`, JSON.stringify(shifts));
-  renderApp();
-}
-
-function renderApp() {
-  const tbody = document.getElementById('tableBody');
-  const month = document.getElementById('monthFilter').value;
-  const filtered = shifts.filter(s => s.date.startsWith(month));
-
-  tbody.innerHTML = '';
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td></tr>`;
-    document.getElementById('sumHours').innerText = '0.00';
-    document.getElementById('sumPay').innerText = '0.00';
-    return;
-  }
-
-  filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
-  let totalH = 0, totalP = 0;
-
-  filtered.forEach(s => {
-    totalH += s.hours;
-    totalP += s.pay;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${s.date.slice(8)}/${s.date.slice(5, 7)} (${s.type === 'weekday' ? 'חול' : 'שבת'})</td>
-      <td>${s.hours.toFixed(2)}ש'</td>
-      <td><strong>${s.pay.toFixed(2)}₪</strong></td>
-      <td><button class="btn-danger" onclick="deleteShift(${s.id})">מחק</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById('sumHours').innerText = totalH.toFixed(2);
-  document.getElementById('sumPay').innerText = totalP.toFixed(2);
-}
-</script>
-</body>
-</html>
+      if (isBeforeSatCutoff) {
+        if (currentHourInShift <= 8) {
+          rateForMinute = (BASE_CALC * 1.50) / 60;
+          categoryKey = `שבת 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
+        } else {
