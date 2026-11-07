@@ -297,16 +297,19 @@ document.addEventListener('DOMContentLoaded', function() {
   let shifts = [];
 
   const today = new Date();
-  document.getElementById('shiftDate').valueAsDate = today;
-  document.getElementById('monthFilter').value = today.toISOString().slice(0, 7);
+  const dateInput = document.getElementById('shiftDate');
+  const monthFilterInput = document.getElementById('monthFilter');
+  
+  if (dateInput) dateInput.valueAsDate = today;
+  if (monthFilterInput) monthFilterInput.value = today.toISOString().slice(0, 7);
 
-  // האזנות כפתורים בטוחות
+  // האזנה לאירועים בטוחה
   document.getElementById('loginBtn').addEventListener('click', handleLogin);
   document.getElementById('logoutBtn').addEventListener('click', handleLogout);
   document.getElementById('toggleBonusBtn').addEventListener('click', toggleBonusEdit);
   document.getElementById('addShiftBtn').addEventListener('click', addShift);
   document.getElementById('bonusInput').addEventListener('input', saveBonus);
-  document.getElementById('monthFilter').addEventListener('change', renderApp);
+  if (monthFilterInput) monthFilterInput.addEventListener('change', renderApp);
 
   document.getElementById('userInput').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') handleLogin();
@@ -344,6 +347,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (savedBonus !== null) {
       document.getElementById('bonusInput').value = savedBonus;
       document.getElementById('bonusDisplay').innerText = savedBonus;
+    } else {
+      document.getElementById('bonusInput').value = "4.6";
+      document.getElementById('bonusDisplay').innerText = "4.6";
     }
 
     shifts = JSON.parse(localStorage.getItem(`shifts_${currentUser}`)) || [];
@@ -371,7 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (endMinutes <= startMinutes) endMinutes += 24 * 60;
 
     const BASE_CALC = 35.4;
-    const BASE_WEEKDAY = BASE_CALC + Number(bonusRate);
+    const BASE_WEEKDAY = BASE_CALC + Number(bonusRate || 4.6);
     const SAT_CUTOFF_MINUTES = 19 * 60;
 
     let totalPay = 0;
@@ -469,20 +475,25 @@ document.addEventListener('DOMContentLoaded', function() {
       pay: res.pay, 
       details: res.details 
     });
+    
+    if (monthFilterInput) {
+      monthFilterInput.value = date.slice(0, 7);
+    }
+    
     saveAndRender();
   }
 
   window.deleteShift = function(id) {
     shifts = shifts.filter(s => s.id !== id);
     saveAndRender();
-  }
+  };
 
   window.toggleDetails = function(id) {
     const detailsRow = document.getElementById(`details-${id}`);
     if (detailsRow) {
       detailsRow.classList.toggle('active');
     }
-  }
+  };
 
   function recalculateAll() {
     const bonus = document.getElementById('bonusInput').value;
@@ -502,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function renderApp() {
     const tbody = document.getElementById('tableBody');
-    const month = document.getElementById('monthFilter').value;
+    const month = monthFilterInput ? monthFilterInput.value : new Date().toISOString().slice(0, 7);
     const filtered = shifts.filter(s => s.date.startsWith(month));
 
     tbody.innerHTML = '';
