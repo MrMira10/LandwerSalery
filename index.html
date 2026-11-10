@@ -16,6 +16,7 @@
             --border-color: #e2e8f0;
             --success-color: #16a34a;
             --danger-color: #dc2626;
+            --warning-color: #d97706;
         }
 
         * {
@@ -107,6 +108,14 @@
             font-size: 0.8rem;
         }
 
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+            width: auto;
+            padding: 6px 10px;
+            font-size: 0.8rem;
+        }
+
         .btn-danger {
             background-color: var(--danger-color);
             color: white;
@@ -161,7 +170,7 @@
 
         th,
         td {
-            padding: 10px 6px;
+            padding: 10px 4px;
             text-align: right;
             border-bottom: 1px solid var(--border-color);
         }
@@ -195,6 +204,12 @@
 
         .details-content ul {
             padding-right: 15px;
+        }
+
+        .actions-cell {
+            display: flex;
+            gap: 4px;
+            align-items: center;
         }
     </style>
 </head>
@@ -235,7 +250,7 @@
             <div id="settingsBox" class="hidden"
                 style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px; background: #f8fafc; padding: 10px; border-radius: 8px;">
                 <div class="form-group" style="margin:0;">
-                    <label>בונוס לשעת חול (₪):</label>
+                    <label>בונוס לשעת חול/מוצ"ש (₪):</label>
                     <input type="number" id="bonusInput" value="4.6" step="0.1">
                 </div>
                 <div class="form-group" style="margin:0;">
@@ -245,9 +260,10 @@
             </div>
         </div>
 
-        <!-- הוספת משמרת -->
+        <!-- הוספת / עריכת משמרת -->
         <div class="section-card">
-            <h3>הוספת משמרת</h3>
+            <h3 id="formTitle">הוספת משמרת</h3>
+            <input type="hidden" id="editingId" value="">
             <div class="form-group">
                 <label>תאריך:</label>
                 <input type="date" id="shiftDate">
@@ -269,7 +285,11 @@
                     <input type="time" id="endTime" value="16:00">
                 </div>
             </div>
-            <button id="addShiftBtn" type="button">הוסף משמרת</button>
+            <div style="display: flex; gap: 8px;">
+                <button id="addShiftBtn" type="button" style="flex: 2;">הוסף משמרת</button>
+                <button id="cancelEditBtn" class="btn-secondary hidden" type="button"
+                    style="flex: 1; background: #cbd5e1;">ביטול</button>
+            </div>
         </div>
 
         <!-- סיכום -->
@@ -308,16 +328,15 @@
             <table>
                 <thead>
                     <tr>
-                        <th>תאריך</th>
+                        <th>תאריך ויום</th>
                         <th>שעות</th>
                         <th>שכר</th>
-                        <th>פירוט</th>
-                        <th>מחיקה</th>
+                        <th>פעולות</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     <tr>
-                        <td colspan="5" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td>
+                        <td colspan="4" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td>
                     </tr>
                 </tbody>
             </table>
@@ -330,6 +349,8 @@
             let currentUser = localStorage.getItem('active_user') || '';
             let shifts = [];
 
+            const daysOfWeek = ['יום ראשון', 'יום שני', 'יום שלישי', 'יום רביעי', 'יום חמישי', 'יום שישי', 'יום שבת'];
+
             const today = new Date();
             const dateInput = document.getElementById('shiftDate');
             const monthFilterInput = document.getElementById('monthFilter');
@@ -340,7 +361,8 @@
             document.getElementById('loginBtn').addEventListener('click', handleLogin);
             document.getElementById('logoutBtn').addEventListener('click', handleLogout);
             document.getElementById('toggleSettingsBtn').addEventListener('click', toggleSettings);
-            document.getElementById('addShiftBtn').addEventListener('click', addShift);
+            document.getElementById('addShiftBtn').addEventListener('click', handleSaveShift);
+            document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
             document.getElementById('bonusInput').addEventListener('input', saveSettings);
             document.getElementById('travelInput').addEventListener('input', saveSettings);
             if (monthFilterInput) monthFilterInput.addEventListener('change', renderApp);
@@ -419,6 +441,11 @@
                 return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
             }
 
+            function getDayName(dateStr) {
+                const d = new Date(dateStr + 'T00:00:00');
+                return daysOfWeek[d.getDay()];
+            }
+
             function calculateIntervalsPay(type, startMin, endMin, bonusRate) {
                 if (endMin <= startMin) endMin += 24 * 60;
 
@@ -464,14 +491,20 @@
                             if (currentHourInShift <= 8) {
                                 rateForMinute = (BASE_CALC * 1.50) / 60;
                                 categoryKey = `שבת 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
-                            } else {
+                            } else if (currentHourInShift <= 10) {
                                 rateForMinute = (BASE_CALC * 1.75) / 60;
                                 categoryKey = `שעות נוספות שבת 175% (${(BASE_CALC * 1.75).toFixed(2)} ₪)`;
+                            } else {
+                                rateForMinute = (BASE_CALC * 2.00) / 60;
+                                categoryKey = `שעות נוספות שבת 200% (${(BASE_CALC * 2.00).toFixed(2)} ₪)`;
                             }
                         } else {
                             if (currentHourInShift <= 8) {
                                 rateForMinute = BASE_WEEKDAY / 60;
                                 categoryKey = `מוצ"ש רגיל (${BASE_WEEKDAY.toFixed(2)} ₪)`;
+                            } else if (currentHourInShift <= 10) {
+                                rateForMinute = (BASE_CALC * 1.25) / 60;
+                                categoryKey = `נוספות מוצ"ש 125% (${(BASE_CALC * 1.25).toFixed(2)} ₪)`;
                             } else {
                                 rateForMinute = (BASE_CALC * 1.50) / 60;
                                 categoryKey = `נוספות מוצ"ש 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
@@ -528,7 +561,8 @@
                 };
             }
 
-            function addShift() {
+            function handleSaveShift() {
+                const editingId = document.getElementById('editingId').value;
                 const date = document.getElementById('shiftDate').value;
                 const type = document.getElementById('shiftType').value;
                 const startStr = document.getElementById('startTime').value;
@@ -544,39 +578,56 @@
                 let newEndMin = timeStrToMin(endStr);
                 if (newEndMin <= newStartMin) newEndMin += 24 * 60;
 
-                let existingShift = shifts.find(s => s.date === date);
-
-                if (existingShift) {
-                    let extStartMin = timeStrToMin(existingShift.rawStart);
-                    let extEndMin = timeStrToMin(existingShift.rawEnd);
-                    if (extEndMin <= extStartMin) extEndMin += 24 * 60;
-
-                    let combinedStart = Math.min(newStartMin, extStartMin);
-                    let combinedEnd = Math.max(newEndMin, extEndMin);
-
-                    const res = calculatePayForUnified(type, combinedStart, combinedEnd, bonus);
-
-                    existingShift.start = minToTimeStr(combinedStart);
-                    existingShift.end = minToTimeStr(combinedEnd);
-                    existingShift.rawStart = minToTimeStr(combinedStart);
-                    existingShift.rawEnd = minToTimeStr(combinedEnd);
-                    existingShift.minutes = res.minutes;
-                    existingShift.pay = res.pay;
-                    existingShift.details = res.details;
+                if (editingId) {
+                    let shift = shifts.find(s => s.id == editingId);
+                    if (shift) {
+                        const res = calculateIntervalsPay(type, newStartMin, newEndMin, bonus);
+                        shift.date = date;
+                        shift.type = type;
+                        shift.start = startStr;
+                        shift.end = endStr;
+                        shift.rawStart = startStr;
+                        shift.rawEnd = endStr;
+                        shift.minutes = res.minutes;
+                        shift.pay = res.pay;
+                        shift.details = res.details;
+                    }
+                    resetForm();
                 } else {
-                    const res = calculatePayForUnified(type, newStartMin, newEndMin, bonus);
-                    shifts.push({
-                        id: Date.now(),
-                        date,
-                        type,
-                        start: startStr,
-                        end: endStr,
-                        rawStart: startStr,
-                        rawEnd: endStr,
-                        minutes: res.minutes,
-                        pay: res.pay,
-                        details: res.details
-                    });
+                    let existingShift = shifts.find(s => s.date === date);
+
+                    if (existingShift) {
+                        let extStartMin = timeStrToMin(existingShift.rawStart);
+                        let extEndMin = timeStrToMin(existingShift.rawEnd);
+                        if (extEndMin <= extStartMin) extEndMin += 24 * 60;
+
+                        let combinedStart = Math.min(newStartMin, extStartMin);
+                        let combinedEnd = Math.max(newEndMin, extEndMin);
+
+                        const res = calculateIntervalsPay(type, combinedStart, combinedEnd, bonus);
+
+                        existingShift.start = minToTimeStr(combinedStart);
+                        existingShift.end = minToTimeStr(combinedEnd);
+                        existingShift.rawStart = minToTimeStr(combinedStart);
+                        existingShift.rawEnd = minToTimeStr(combinedEnd);
+                        existingShift.minutes = res.minutes;
+                        existingShift.pay = res.pay;
+                        existingShift.details = res.details;
+                    } else {
+                        const res = calculateIntervalsPay(type, newStartMin, newEndMin, bonus);
+                        shifts.push({
+                            id: Date.now(),
+                            date,
+                            type,
+                            start: startStr,
+                            end: endStr,
+                            rawStart: startStr,
+                            rawEnd: endStr,
+                            minutes: res.minutes,
+                            pay: res.pay,
+                            details: res.details
+                        });
+                    }
                 }
 
                 if (monthFilterInput) {
@@ -586,8 +637,33 @@
                 saveAndRender();
             }
 
-            function calculatePayForUnified(type, startMin, endMin, bonus) {
-                return calculateIntervalsPay(type, startMin, endMin, bonus);
+            window.editShift = function (id) {
+                const shift = shifts.find(s => s.id == id);
+                if (!shift) return;
+
+                document.getElementById('editingId').value = shift.id;
+                document.getElementById('shiftDate').value = shift.date;
+                document.getElementById('shiftType').value = shift.type;
+                document.getElementById('startTime').value = shift.rawStart || shift.start;
+                document.getElementById('endTime').value = shift.rawEnd || shift.end;
+
+                document.getElementById('formTitle').innerText = "עריכת משמרת";
+                document.getElementById('addShiftBtn').innerText = "שמור שינויים";
+                document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            function resetForm() {
+                document.getElementById('editingId').value = '';
+                document.getElementById('shiftDate').valueAsDate = new Date();
+                document.getElementById('shiftType').value = 'weekday';
+                document.getElementById('startTime').value = '08:00';
+                document.getElementById('endTime').value = '16:00';
+
+                document.getElementById('formTitle').innerText = "הוספת משמרת";
+                document.getElementById('addShiftBtn').innerText = "הוסף משמרת";
+                document.getElementById('cancelEditBtn').classList.add('hidden');
             }
 
             window.deleteShift = function (id) {
@@ -627,7 +703,7 @@
 
                 tbody.innerHTML = '';
                 if (filtered.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">אין משמרות בחודש זה</td></tr>`;
                     document.getElementById('sumHours').innerText = '0:00';
                     document.getElementById('sumPay').innerText = '0.00';
                     document.getElementById('sumShiftsCount').innerText = '0';
@@ -647,24 +723,30 @@
                     totalPayMonth += s.pay;
 
                     const formattedHours = formatMinutesToHours(s.minutes);
+                    const dayName = getDayName(s.date);
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
         <td>
-          ${s.date.slice(8)}/${s.date.slice(5, 7)} (${s.type === 'weekday' ? 'חול' : 'שבת'})<br>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">${s.start}-${s.end}</span>
+          <strong>${s.date.slice(8)}/${s.date.slice(5, 7)}</strong> (${dayName})<br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">${s.type === 'weekday' ? 'חול' : 'שבת'} | ${s.start}-${s.end}</span>
         </td>
         <td>${formattedHours} ש'</td>
         <td><strong>${s.pay.toFixed(2)}₪</strong></td>
-        <td><button class="btn-secondary" type="button" onclick="toggleDetails(${s.id})">חישוב</button></td>
-        <td><button class="btn-danger" type="button" onclick="deleteShift(${s.id})">מחק</button></td>
+        <td>
+          <div class="actions-cell">
+            <button class="btn-secondary" type="button" onclick="toggleDetails(${s.id})" title="פירוט">חישוב</button>
+            <button class="btn-warning" type="button" onclick="editShift(${s.id})" title="עריכה">ערוך</button>
+            <button class="btn-danger" type="button" onclick="deleteShift(${s.id})" title="מחיקה">מחק</button>
+          </div>
+        </td>
       `;
 
                     const detailsTr = document.createElement('tr');
                     detailsTr.id = `details-${s.id}`;
                     detailsTr.className = 'details-row';
                     detailsTr.innerHTML = `
-        <td colspan="5">
+        <td colspan="4">
           <div class="details-content">
             <strong>פירוט חישוב:</strong>
             <ul>
