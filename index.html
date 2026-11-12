@@ -491,14 +491,13 @@
                             if (currentHourInShift <= 8) {
                                 rateForMinute = (BASE_CALC * 1.50) / 60;
                                 categoryKey = `שבת 150% (${(BASE_CALC * 1.50).toFixed(2)} ₪)`;
-                            } else if (currentHourInShift <= 10) {
+                            } else {
+                                // שעות נוספות בשבת נעצרות על 175% ללא קפיצה מעבר לכך
                                 rateForMinute = (BASE_CALC * 1.75) / 60;
                                 categoryKey = `שעות נוספות שבת 175% (${(BASE_CALC * 1.75).toFixed(2)} ₪)`;
-                            } else {
-                                rateForMinute = (BASE_CALC * 2.00) / 60;
-                                categoryKey = `שעות נוספות שבת 200% (${(BASE_CALC * 2.00).toFixed(2)} ₪)`;
                             }
                         } else {
+                            // במוצ"ש - ממשיך לפי מדרגות השעות של המשמרת
                             if (currentHourInShift <= 8) {
                                 rateForMinute = BASE_WEEKDAY / 60;
                                 categoryKey = `מוצ"ש רגיל (${BASE_WEEKDAY.toFixed(2)} ₪)`;
